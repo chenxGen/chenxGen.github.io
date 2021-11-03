@@ -551,7 +551,7 @@ body {
   }
 }
 .max-width {
-  max-width: 48rem;
+  max-width: 54rem;
 }
 @media (max-width: 480px) {
   .px3 {
@@ -1116,42 +1116,6 @@ article .content .video-container embed {
   width: 100%;
   height: 100%;
 }
-article .content blockquote {
-  margin: 1rem 10px;
-  padding: 0.5em 10px;
-  background: inherit;
-  color: #ccffb6;
-  quotes: "\201C" "\201D" "\2018" "\2019";
-  font-weight: bold;
-}
-article .content blockquote p {
-  margin: 0;
-}
-article .content blockquote:before {
-  margin-right: 0.25em;
-  color: #ccffb6;
-  content: "\201C";
-  vertical-align: -0.4em;
-  font-size: 2em;
-  line-height: 0.1em;
-}
-article .content blockquote footer {
-  margin: line-height 0;
-  color: #908d8d;
-  font-size: 12px;
-}
-article .content blockquote footer a {
-  background-image: linear-gradient(transparent, transparent 5px, #908d8d 5px, #908d8d);
-  color: #908d8d;
-}
-article .content blockquote footer a:hover {
-  background-image: linear-gradient(transparent, transparent 4px, #a6a4a4 4px, #a6a4a4);
-  color: #a6a4a4;
-}
-article .content blockquote footer cite:before {
-  padding: 0 0.5em;
-  content: "—";
-}
 article .content .pullquote {
   margin: 0;
   width: 45%;
@@ -1637,4 +1601,40 @@ code {
 }
 .highlight .line {
   height: 22px;
+}
+blockquote {
+  margin: 1rem 10px;
+  padding: 0.5em 10px;
+  background: inherit;
+  color: #ccffb6;
+  quotes: "\201C" "\201D" "\2018" "\2019";
+  font-weight: bold;
+}
+blockquote p {
+  margin: 0;
+}
+blockquote:before {
+  margin-right: 0.25em;
+  color: #ccffb6;
+  content: "\201C";
+  vertical-align: -0.4em;
+  font-size: 2em;
+  line-height: 0.1em;
+}
+blockquote footer {
+  margin: line-height 0;
+  color: #908d8d;
+  font-size: 12px;
+}
+blockquote footer a {
+  background-image: linear-gradient(transparent, transparent 5px, #908d8d 5px, #908d8d);
+  color: #908d8d;
+}
+blockquote footer a:hover {
+  background-image: linear-gradient(transparent, transparent 4px, #a6a4a4 4px, #a6a4a4);
+  color: #a6a4a4;
+}
+blockquote footer cite:before {
+  padding: 0 0.5em;
+  content: "—";
 }
