@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="问题背景我们知道一般的链式调用的设计如下： 1234@interface Base : NSObject- (Base *)one;- (Base *(^)(void))blockOne;@end  这样可以做到类型为 Base 的对象 obj 实现如下的链式调用：obj.blockOne().one.blockOne().one....；那么如果有一个类 A 继承自 Base呢？要让类型为 A">
+<meta property="og:type" content="article">
+<meta property="og:title" content="objective-c语言环境下关于可继承的链式调用实现的思考">
+<meta property="og:url" content="https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/index.html">
+<meta property="og:site_name" content="chenxGen">
+<meta property="og:description" content="问题背景我们知道一般的链式调用的设计如下： 1234@interface Base : NSObject- (Base *)one;- (Base *(^)(void))blockOne;@end  这样可以做到类型为 Base 的对象 obj 实现如下的链式调用：obj.blockOne().one.blockOne().one....；那么如果有一个类 A 继承自 Base呢？要让类型为 A">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2021-11-02T07:09:38.000Z">
+<meta property="article:modified_time" content="2021-11-03T07:12:57.008Z">
+<meta property="article:author" content="chenxGen">
+<meta name="twitter:card" content="summary">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>objective-c语言环境下关于可继承的链式调用实现的思考</title>
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" aria-label="Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a href="/projects_url">Projects</a></li><!--
+     -->
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        
+        <li><a class="icon" aria-label="Back to top" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&text=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&is_video=false&description=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=objective-c语言环境下关于可继承的链式调用实现的思考&body=Check out this article: https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&name=objective-c语言环境下关于可继承的链式调用实现的思考&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&t=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%E8%83%8C%E6%99%AF"><span class="toc-number">1.</span> <span class="toc-text">问题背景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%9D%E8%80%83"><span class="toc-number">2.</span> <span class="toc-text">思考</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8C%87%E5%AE%9A%E8%BF%94%E5%9B%9E%E5%80%BC%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="toc-number">2.1.</span> <span class="toc-text">指定返回值的类型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#instancetype%E5%85%B3%E9%94%AE%E5%AD%97"><span class="toc-number">2.2.</span> <span class="toc-text">instancetype关键字</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B3%9B%E5%9E%8B"><span class="toc-number">2.3.</span> <span class="toc-text">泛型</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9C%80%E5%90%8E"><span class="toc-number">3.</span> <span class="toc-text">最后</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        objective-c语言环境下关于可继承的链式调用实现的思考
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">chenxGen</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2021-11-02T07:09:38.000Z" itemprop="datePublished">2021-11-02</time>
+        
+        (Updated: <time datetime="2021-11-03T07:12:57.008Z" itemprop="dateModified">2021-11-03</time>)
+        
+      
+    </div>
+
+
+      
+
+      
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><p>我们知道一般的链式调用的设计如下：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">Base</span> : <span class="title">NSObject</span></span></span><br><span class="line">- (Base *)one;</span><br><span class="line">- (Base *(^)(<span class="keyword">void</span>))blockOne;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>这样可以做到类型为 Base 的对象 obj 实现如下的链式调用：<code>obj.blockOne().one.blockOne().one....</code>；那么如果有一个类 A 继承自 Base呢？要让类型为 A 的对象实现包括 A 本身的链式调用该怎么设计呢？假设我们这样设计 A ：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">A</span> : <span class="title">Base</span></span></span><br><span class="line">- (A *)two;</span><br><span class="line">- (A *(^)(<span class="keyword">void</span>))blockTwo;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>类型为 A 的对象 obj 现在是可以链式调用 A 类本身的方法，原理同上，但是如果我们调用了父类 Base 的方法，此时就无法再去调用 A 类本身的方法了，也就是“断链”了。</p>
+<h2 id="思考"><a href="#思考" class="headerlink" title="思考"></a>思考</h2><p>那么我们该如何设计这两个类呢？问题的本质是<strong>如何让编译器“智能”的识别方法返回值类型</strong>，首先排除了重写父类 one/blockOne 方法的方案，因为如果 Base 的方法如果有很多那我们必须按都重写一遍显然不合理，并且如果还有类 B 继承自 A 呢，B 需要重写的方法是 A + Base 的，随着继承关系的深度线性增长。</p>
+<h3 id="指定返回值的类型"><a href="#指定返回值的类型" class="headerlink" title="指定返回值的类型"></a>指定返回值的类型</h3><p>问题本质是由于方法返回值类型不确定造成的，那么如果我们用一个将返回值统一为一个实现了 Base 和 A 的接口的类呢？</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">@class</span> <span class="title">ChainCall</span>;</span></span><br><span class="line"><span class="class"><span class="keyword">@protocol</span> <span class="title">BaseProtocol</span> &lt;<span class="title">NSObject</span>&gt;</span></span><br><span class="line">- (ChainCall *)one;</span><br><span class="line">- (ChainCall *(^)(<span class="keyword">void</span>))blockOne;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@protocol</span> <span class="title">AProtocol</span> &lt;<span class="title">NSObject</span>&gt;</span></span><br><span class="line">- (ChainCall *)two;</span><br><span class="line">- (ChainCall *(^)(<span class="keyword">void</span>))blockTwo;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">Base</span> : <span class="title">NSObject</span>&lt;<span class="title">BaseProtocol</span>&gt;</span></span><br><span class="line"><span class="keyword">@property</span> (<span class="keyword">nonatomic</span>, <span class="keyword">weak</span>) ChainCall *chain;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">A</span> : <span class="title">Base</span>&lt;<span class="title">AProtocol</span>&gt;</span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">ChainCall</span> : <span class="title">NSObject</span>&lt;<span class="title">BaseProtocol</span>, <span class="title">AProtocol</span>&gt;</span></span><br><span class="line"><span class="keyword">@property</span> (<span class="keyword">nonatomic</span>, <span class="keyword">weak</span>) Base *obj;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>先忽略上述类的方法实现，单纯从接口来看，确实可以实现类型为 A 的对象 obj 的链式调用 : <code>obj.one.blockOne(0).blockTwo(0).two...</code>，但是类型为 Base 的对象同样也可以使用如上的调用，这样接口没了边界，所有接口成了一锅大杂烩，并且需要在 ChainCall 的每个方法实现中判断持有对象是否支持对应的方法，以及完成消息转发。</p>
+<p>由于觉得每个方法都手动实现转发会有些麻烦，于是想通过 runtime 的消息转发原理将调用转发到持有的对象调用，做了如下的尝试：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">ChainCall</span></span></span><br><span class="line">- (<span class="built_in">NSMethodSignature</span> *)methodSignatureForSelector:(SEL)aSelector &#123;</span><br><span class="line">    <span class="built_in">NSMethodSignature</span> *sig = [<span class="keyword">super</span> methodSignatureForSelector:aSelector];</span><br><span class="line">    <span class="keyword">if</span> (sig == <span class="literal">nil</span>) &#123;</span><br><span class="line">        Method m = class_getInstanceMethod([<span class="keyword">self</span> <span class="keyword">class</span>], <span class="keyword">@selector</span>(getSelf));</span><br><span class="line">        <span class="keyword">const</span> <span class="keyword">char</span> *encoding = method_getTypeEncoding(m);</span><br><span class="line">        sig = [<span class="built_in">NSMethodSignature</span> signatureWithObjCTypes:encoding];</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> sig;</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">id</span>)forwardingTargetForSelector:(SEL)aSelector &#123;</span><br><span class="line">    <span class="keyword">if</span> ([<span class="keyword">self</span>.obj respondsToSelector:aSelector]) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">self</span>.obj;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> [<span class="keyword">super</span> forwardingTargetForSelector:aSelector];</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">void</span>)forwardInvocation:(<span class="built_in">NSInvocation</span> *)anInvocation &#123;</span><br><span class="line">    [anInvocation setSelector:<span class="keyword">@selector</span>(getSelf)];</span><br><span class="line">    [anInvocation invokeWithTarget:<span class="keyword">self</span>];</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">- (ChainableCall *)getSelf &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>通过 <code>forwardingTargetForSelector</code> 将调用转发确实没有问题，但是在调用不支持的 selector 的兼容处理上遇到了困难，设计的策略是调用不存在的方法直接返回当前对象，使得后面的调用可以生效，但是返回值为 block 类型的方法，返回 ChainCall 之后执行 block 就直接闪退了，想想也是理所当然的，<br>把一个对象当成 block 来使用。但是如果需要针对 block 生成相应的方法转发是不现实的，首先通过 runtime 无法获取到返回值为 block 类型的确定参数个数和类型，再者也无法根据 block 类型生成对应的实现。</p>
+<p>所以 ChainCall 只剩下一个手动一个个实现协议方法的方案了，每个协议方法的实现都需要判断是否支持，不支持则返回 self ：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">ChainCall</span></span></span><br><span class="line">- (ChainCall *)one &#123;</span><br><span class="line">  <span class="keyword">if</span> ([<span class="keyword">self</span>.obj respondsToSelector:_cmd]) &#123;</span><br><span class="line">    <span class="keyword">id</span>&lt;BaseProtocol&gt; obj = (<span class="keyword">id</span>&lt;BaseProtocol&gt;)<span class="keyword">self</span>.obj;</span><br><span class="line">    <span class="keyword">return</span> [obj one];</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line">- (ChainCall *(^)(<span class="keyword">void</span>))blockOne &#123;</span><br><span class="line">  <span class="keyword">if</span> ([<span class="keyword">self</span>.obj respondsToSelector:_cmd]) &#123;</span><br><span class="line">    <span class="keyword">id</span>&lt;BaseProtocol&gt; obj = (<span class="keyword">id</span>&lt;BaseProtocol&gt;)<span class="keyword">self</span>.obj;</span><br><span class="line">    <span class="keyword">return</span> [obj blockOne];</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> ^ ChainCall *(<span class="keyword">void</span>) &#123;</span><br><span class="line">      <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">  &#125;;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>结合上面提到的接口边界问题，另外还可能存在方法命名冲突等问题，所以这个方案并不是个好的解决方案。</p>
+<h3 id="instancetype关键字"><a href="#instancetype关键字" class="headerlink" title="instancetype关键字"></a>instancetype关键字</h3><p>说到继承关系对象类型的“智能”识别， 你可能会想到 instancetype 关键字，确实如果我们将 one/two 的返回值修改为 instancetype，可以实现 <code>obj.one.two</code>的调用，但是 block 不行，instancetype 只能针对 oc 的方法做返回值类型关联，参考：</p>
+<blockquote>
+<p>A method with a related result type can be declared by using the type instancetype as its result type. instancetype is a contextual keyword that is only permitted in the result type of an Objective-C method, e.g.<br><a target="_blank" rel="noopener" href="https://clang.llvm.org/docs/LanguageExtensions.html#objective-c-features">Clang docs about instancetype</a></p>
+</blockquote>
+<h3 id="泛型"><a href="#泛型" class="headerlink" title="泛型"></a>泛型</h3><p>除了 instancetype 关键字，返回值类型的智能识别我也智能想到使用泛型了，我们将 Base 设置成支持泛型：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">Base</span>&lt;<span class="title">T</span>&gt; : <span class="title">NSObject</span></span></span><br><span class="line">- (T)one;</span><br><span class="line">- (T(^)(<span class="keyword">void</span>))blockOne;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>这时候如果 A 实现如下：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// A1</span></span><br><span class="line"><span class="class"><span class="keyword">@class</span> <span class="title">A</span>;</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">A</span> : <span class="title">Base</span>&lt;<span class="title">A</span> *&gt;</span></span><br><span class="line">- (A *)two;</span><br><span class="line">- (A *(^)(<span class="keyword">void</span>))blockTwo;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>类型为 A 的 obj 对象确实也可以实现链式调用，但是 A 本身的泛型变成了不可继承了，继承自 A 的类 B 对应的对象调用 A 的方法就不能调用 B 本身的方法了，这样自也是行不通的。那也就是 A 需要变成泛型可继承的：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// A2</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">A</span>&lt;<span class="title">T</span>&gt; : <span class="title">Base</span>&lt;<span class="title">T</span>&gt;</span></span><br><span class="line">- (T)two;</span><br><span class="line">- (T (^)(<span class="keyword">void</span>))blockTwo;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>由于 A 的返回值是泛型对象，那需要生成类型为 A&lt;A *&gt; 的 obj 来调用，但是 obj 调用任意方法之后，返回的 T 为 A 类型，并非 A&lt;A *&gt;， 也就导致了再次任意方法之后，返回值变成了 id 类型，后面也就“断链”了。</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">A&lt;A *&gt; *obj;</span><br><span class="line">obj.one.two; <span class="comment">// 执行one类型变成A,执行two之后类型变成了id</span></span><br></pre></td></tr></table></figure>
+
+<p>所以这要怎么搞呢，头疼了一天，想到个折中一点的方案，对于没有继承需求的类来说，按照 A1 方案生成对应的实现类，对于有继承需求的类来说生成一个可继承泛型的类来给子类继承，同时单独生成一个具备相同接口的实现类：</p>
+<figure class="highlight objc"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">@class</span> <span class="title">Base</span>;</span></span><br><span class="line"><span class="class"><span class="keyword">@protocol</span> <span class="title">BaseProtocol</span> &lt;<span class="title">NSObject</span>&gt;</span></span><br><span class="line">- (Base *)one;</span><br><span class="line">- (Base *)blockOne;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 提供给子类继承的类</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">BaseInterface</span>&lt;<span class="title">T</span>&gt; : <span class="title">NSObject</span>&lt;<span class="title">BaseProtocol</span>&gt;</span></span><br><span class="line"><span class="keyword">@property</span> (<span class="keyword">nonatomic</span>, <span class="keyword">strong</span>) <span class="keyword">id</span>&lt;BaseProtocol&gt; obj;</span><br><span class="line"><span class="comment">// 重写接口</span></span><br><span class="line">- (T)one;</span><br><span class="line">- (T(^)(<span class="keyword">void</span>))blockOne;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">BaseInterface</span></span></span><br><span class="line">- (<span class="keyword">id</span>)forwardingTargetForSelector:(SEL)aSelector &#123;</span><br><span class="line">    <span class="keyword">if</span> ([<span class="keyword">self</span>.obj respondsToSelector:aSelector]) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">self</span>.obj;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> [<span class="keyword">super</span> forwardingTargetForSelector:aSelector];</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Base实际的实现类</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">Base</span> : <span class="title">NSObject</span>&lt;<span class="title">BaseProtocol</span>&gt;</span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">Base</span></span></span><br><span class="line">- (Base *)one &#123;</span><br><span class="line">   <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line">- (Base *(^)(<span class="keyword">void</span>))blockOne &#123;</span><br><span class="line">  <span class="keyword">return</span> ^Base *(<span class="keyword">void</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">  &#125;;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@protocol</span> <span class="title">AProtocol</span> &lt;<span class="title">BaseProtocol</span>&gt;</span></span><br><span class="line">- (A *)two;</span><br><span class="line">- (A *(^)(<span class="keyword">void</span>))blockTwo;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 提供给子类继承的类</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">AInterface</span>&lt;<span class="title">T</span>&gt; : <span class="title">BaseInterface</span>&lt;<span class="title">T</span>&gt;&lt;<span class="title">AProtocol</span>&gt;</span></span><br><span class="line"><span class="comment">// 重写接口</span></span><br><span class="line">- (T)two;</span><br><span class="line">- (T(^)(<span class="keyword">void</span>))blockTwo;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">AInterface</span></span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// A实际的实现类</span></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">A</span> : <span class="title">Base</span>&lt;<span class="title">AProtocol</span>&gt;</span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">A</span></span></span><br><span class="line">- (A *)two &#123;</span><br><span class="line">   <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">&#125;</span><br><span class="line">- (A *(^)(<span class="keyword">void</span>))blockTwo &#123;</span><br><span class="line">  <span class="keyword">return</span> ^A *(<span class="keyword">void</span>) &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">self</span>;</span><br><span class="line">  &#125;;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>这样类型为 A 的对象 obj 可以实现链式调用，同时子类也可以继承自 AInterface 继承泛型，达到我们需要的效果；当然，这个方案的缺点也很明显，其一是每个方法都需要重写一遍，同上面的 ChainCall 方案；其二相同的功能类需要创建两个，以及两个区别的理解成本；<br>但是这个方案使得调用接口有了边界，接口调用不会存在歧义，个人倾向于这个方案来解决这个问题。</p>
+<h2 id="最后"><a href="#最后" class="headerlink" title="最后"></a>最后</h2><p>以上就是本次针对这个可继承链式调用的思考过程，最后 pick 的方案是使用泛型和一个实现类/一个继承类解决这个问题；花了几天的时间去思考这个问题的实现方式（做梦都在想。。），最后总算有个比较能接受的方案。如果你有更好的方案，请不吝赐教哦。</p>
+
+  </div>
+</article>
+
+
+    <div class="blog-post-comments">
+        <div id="utterances_thread">
+            <noscript>Please enable JavaScript to view the comments.</noscript>
+        </div>
+    </div>
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/about/">About</a></li>
+         
+          <li><a href="/archives/">Writing</a></li>
+         
+          <li><a href="/projects_url">Projects</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%E8%83%8C%E6%99%AF"><span class="toc-number">1.</span> <span class="toc-text">问题背景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%9D%E8%80%83"><span class="toc-number">2.</span> <span class="toc-text">思考</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%8C%87%E5%AE%9A%E8%BF%94%E5%9B%9E%E5%80%BC%E7%9A%84%E7%B1%BB%E5%9E%8B"><span class="toc-number">2.1.</span> <span class="toc-text">指定返回值的类型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#instancetype%E5%85%B3%E9%94%AE%E5%AD%97"><span class="toc-number">2.2.</span> <span class="toc-text">instancetype关键字</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%B3%9B%E5%9E%8B"><span class="toc-number">2.3.</span> <span class="toc-text">泛型</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%9C%80%E5%90%8E"><span class="toc-number">3.</span> <span class="toc-text">最后</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&text=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&is_video=false&description=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=objective-c语言环境下关于可继承的链式调用实现的思考&body=Check out this article: https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&title=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&name=objective-c语言环境下关于可继承的链式调用实现的思考&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=https://chenxgen.github.io/2021/11/02/objective-c-inherit-chain-call/&t=objective-c语言环境下关于可继承的链式调用实现的思考"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2021
+    chenxGen
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/about/">About</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Writing</a></li><!--
+     --><!--
+       --><li><a href="/projects_url">Projects</a></li><!--
+     -->
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+ 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script> 
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script> 
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>'; 
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Google Analytics -->
+
+<!-- Baidu Analytics -->
+
+<!-- Cloudflare Analytics -->
+
+<!-- Umami Analytics -->
+
+<!-- Disqus Comments -->
+
+<!-- utterances Comments -->
+
+    <script type="text/javascript">
+      var utterances_repo = 'chenxGen/utterances';
+      var utterances_issue_term = 'title';
+      var utterances_label = 'blog';
+      var utterances_theme = 'github-dark';
+
+      (function(){
+          var script = document.createElement('script');
+
+          script.src = 'https://utteranc.es/client.js';
+          script.setAttribute('repo', utterances_repo);
+          script.setAttribute('issue-term', 'pathname');
+          script.setAttribute('label', utterances_label);
+          script.setAttribute('theme', utterances_theme);
+          script.setAttribute('crossorigin', 'anonymous');
+          script.async = true;
+          (document.getElementById('utterances_thread')).appendChild(script);
+      }());
+  </script>
+
+</body>
+</html>
