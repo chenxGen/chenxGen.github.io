@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang=en>
+<head>
+    <!-- so meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="description" content="问题背景在 iOS 开发中，KVO 的使用一直都需要格外的小心，观察者的添加和移除需要匹配使用，不然在观察者和被观察者两者释放的时候部分系统下（iOS 11 以下）会出现闪退；其中出名的开源库 KVOController 是通过强持有对象来保证不会出现闪退的：  观察者释放的场景：KVOController 使用的一个单例作为观察者容器，然后分发事件，也就是有且仅有一个观察者，并且它是不会被释放的">
+<meta property="og:type" content="article">
+<meta property="og:title" content="关于 Objective-C 中监听对象释放的几种尝试">
+<meta property="og:url" content="https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/index.html">
+<meta property="og:site_name" content="chenxGen">
+<meta property="og:description" content="问题背景在 iOS 开发中，KVO 的使用一直都需要格外的小心，观察者的添加和移除需要匹配使用，不然在观察者和被观察者两者释放的时候部分系统下（iOS 11 以下）会出现闪退；其中出名的开源库 KVOController 是通过强持有对象来保证不会出现闪退的：  观察者释放的场景：KVOController 使用的一个单例作为观察者容器，然后分发事件，也就是有且仅有一个观察者，并且它是不会被释放的">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2022-01-29T04:40:34.000Z">
+<meta property="article:modified_time" content="2022-02-28T13:37:23.107Z">
+<meta property="article:author" content="chenxGen">
+<meta property="article:tag" content="iOS">
+<meta property="article:tag" content="Objective-C">
+<meta name="twitter:card" content="summary">
+    
+    
+      
+        
+          <link rel="shortcut icon" href="/images/favicon.ico">
+        
+      
+      
+        
+          <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+        
+      
+      
+        
+          <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+        
+      
+    
+    <!-- title -->
+    <title>关于 Objective-C 中监听对象释放的几种尝试</title>
+    <!-- styles -->
+    
+<link rel="stylesheet" href="/css/style.css">
+
+    <!-- persian styles -->
+    
+    <!-- rss -->
+    
+    
+	<!-- mathjax -->
+	
+<meta name="generator" content="Hexo 5.4.0"></head>
+
+<body class="max-width mx-auto px3 ltr">
+    
+      <div id="header-post">
+  <a id="menu-icon" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="menu-icon-tablet" href="#" aria-label="Menu"><i class="fas fa-bars fa-lg"></i></a>
+  <a id="top-icon-tablet" href="#" aria-label="Top" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');" style="display:none;"><i class="fas fa-chevron-up fa-lg"></i></a>
+  <span id="menu">
+    <span id="nav">
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Archives</a></li><!--
+     -->
+      </ul>
+    </span>
+    <br/>
+    <span id="actions">
+      <ul>
+        
+        
+        <li><a class="icon" aria-label="Next post" href="/2021/11/02/objective-c-inherit-chain-call/"><i class="fas fa-chevron-right" aria-hidden="true" onmouseover="$('#i-next').toggle();" onmouseout="$('#i-next').toggle();"></i></a></li>
+        
+        <li><a class="icon" aria-label="Back to top" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up" aria-hidden="true" onmouseover="$('#i-top').toggle();" onmouseout="$('#i-top').toggle();"></i></a></li>
+        <li><a class="icon" aria-label="Share post" href="#"><i class="fas fa-share-alt" aria-hidden="true" onmouseover="$('#i-share').toggle();" onmouseout="$('#i-share').toggle();" onclick="$('#share').toggle();return false;"></i></a></li>
+      </ul>
+      <span id="i-prev" class="info" style="display:none;">Previous post</span>
+      <span id="i-next" class="info" style="display:none;">Next post</span>
+      <span id="i-top" class="info" style="display:none;">Back to top</span>
+      <span id="i-share" class="info" style="display:none;">Share post</span>
+    </span>
+    <br/>
+    <div id="share" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/"><i class="fab fa-facebook " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&text=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-twitter " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-linkedin " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&is_video=false&description=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-pinterest " aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=关于 Objective-C 中监听对象释放的几种尝试&body=Check out this article: https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/"><i class="fas fa-envelope " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-get-pocket " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-reddit " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-stumbleupon " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-digg " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&name=关于 Objective-C 中监听对象释放的几种尝试&description="><i class="fab fa-tumblr " aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&t=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-hacker-news " aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%E8%83%8C%E6%99%AF"><span class="toc-number">1.</span> <span class="toc-text">问题背景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Associated-Object-%E6%96%B9%E6%A1%88"><span class="toc-number">2.</span> <span class="toc-text">Associated Object 方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#ISA-Swizzling-%E6%96%B9%E6%A1%88"><span class="toc-number">3.</span> <span class="toc-text">ISA Swizzling 方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Method-Swizzling-%E6%96%B9%E6%A1%88"><span class="toc-number">4.</span> <span class="toc-text">Method Swizzling 方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">5.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E9%93%BE%E6%8E%A5"><span class="toc-number">6.</span> <span class="toc-text">参考链接</span></a></li></ol>
+    </div>
+  </span>
+</div>
+
+    
+    <div class="content index py4">
+        
+        <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+  <header>
+    
+    <h1 class="posttitle" itemprop="name headline">
+        关于 Objective-C 中监听对象释放的几种尝试
+    </h1>
+
+
+
+    <div class="meta">
+      <span class="author" itemprop="author" itemscope itemtype="http://schema.org/Person">
+        <span itemprop="name">chenxGen</span>
+      </span>
+      
+    <div class="postdate">
+      
+        <time datetime="2022-01-29T04:40:34.000Z" itemprop="datePublished">2022-01-29</time>
+        
+      
+    </div>
+
+
+      
+
+      
+    <div class="article-tag">
+        <i class="fas fa-tag"></i>
+        <a class="tag-link-link" href="/tags/Objective-C/" rel="tag">Objective-C</a>, <a class="tag-link-link" href="/tags/iOS/" rel="tag">iOS</a>
+    </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content" itemprop="articleBody">
+    <h2 id="问题背景"><a href="#问题背景" class="headerlink" title="问题背景"></a>问题背景</h2><p>在 iOS 开发中，KVO 的使用一直都需要格外的小心，观察者的添加和移除需要匹配使用，不然在观察者和被观察者两者释放的时候部分系统下（iOS 11 以下）会出现闪退；其中出名的开源库 KVOController 是通过强持有对象来保证不会出现闪退的：</p>
+<ol>
+<li>观察者释放的场景：KVOController 使用的一个单例作为观察者容器，然后分发事件，也就是有且仅有一个观察者，并且它是不会被释放的，也就是避免了闪退的问题；</li>
+<li>被观察者释放的场景：KVOController 中被观察者都是强引用的，也就是一定要手动移除被观察者，不然对象不释放，所以也不存在被观察者释放但是还存在监听者的情况。</li>
+</ol>
+<p>如果我们要自己实现一个观察者的自动移除方案需要怎么做呢？问题的本质是获取到对象的释放时机然后移除观察者，就目前看来有以下方案可选：</p>
+<ol>
+<li>Associated Object 方案</li>
+<li>ISA Swizzling 方案</li>
+<li>Method Swizzling 方案</li>
+</ol>
+<h2 id="Associated-Object-方案"><a href="#Associated-Object-方案" class="headerlink" title="Associated Object 方案"></a>Associated Object 方案</h2><p>在杨帝的这篇博客中<a target="_blank" rel="noopener" href="https://yulingtianxia.com/blog/2017/12/15/Associated-Object-and-Dealloc/">《Associated Object 与 Dealloc》</a>有描述其在开源库 MessageThrottle 中使用 Associated Object 实现监听任意对象的释放过程，其大致原理如下：</p>
+<blockquote>
+<p>当一个对象（Host）释放后，其关联的对象（Associated Object）也会被解除。可以在 Host 对象上添加 Associated Object，策略用 OBJC_ASSOCIATION_RETAIN。由于只有 Host 持有了这个 Associated Object，当 Host 释放后 Associated Object 也会被释放。在 Associated Object 的 dealloc 方法中告知外界其 Host 对象已经释放。Perfect！</p>
+</blockquote>
+<p>同样 Github 上也找到一个使用相似的方案实现对象释放监听的轮子：<a target="_blank" rel="noopener" href="https://github.com/ChenYilong/CYLDeallocBlockExecutor">CYLDeallocBlockExecutor</a>。</p>
+<p>这个方案本身可以实现获取对象释放时机的目的，但是该方案不能解决我们实现 KVO 观察者自动移除的需求，原因是系统抛出的 KVO 异常在 Associated Object 移除之前，我们来看下这种场景下的 crash 堆栈：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">Date/Time:       2021-12-23 11:47:24.000 +0800</span><br><span class="line">OS Version:      iOS 10.1.1 (14B100)</span><br><span class="line">Report Version:  104</span><br><span class="line"></span><br><span class="line">Exception Type:  EXC_CRASH (SIGABRT)</span><br><span class="line">Exception Codes: 0x00000000 at 0x0000000000000000</span><br><span class="line">Crashed Thread:  0</span><br><span class="line"></span><br><span class="line">Application Specific Information:</span><br><span class="line">*** Terminating app due to uncaught exception &#x27;NSInternalInconsistencyException&#x27;, reason: &#x27;An instance 0x14fc238d0 of class XXClass was deallocated while key value observers were still registered with it. Current observation info: &lt;NSKeyValueObservationInfo 0x17063df80&gt; (</span><br><span class="line">&lt;NSKeyValueObservance 0x171459b30: Observer: 0x171664900, Key path: xx_keypath, Options: &lt;New: YES, Old: NO, Prior: NO&gt; Context: 0x0, Property: 0x171459c50&gt;</span><br><span class="line">)&#x27;</span><br><span class="line"></span><br><span class="line">Thread 0 Crashed:</span><br><span class="line">0   CoreFoundation                  __exceptionPreprocess  +124</span><br><span class="line">1   libobjc.A.dylib                 objc_exception_throw  +56</span><br><span class="line">2   CoreFoundation                  -[NSException initWithCoder:]  +0</span><br><span class="line">3   Foundation                      NSKVODeallocate  +300</span><br><span class="line">4   UIKit                           __destroy_helper_block_.123  +80</span><br><span class="line">5   libsystem_blocks.dylib          _Block_release  +144</span><br><span class="line">6   UIKit                           -[UIViewAnimationBlockDelegate .cxx_destruct]  +56</span><br><span class="line">7   libobjc.A.dylib                 object_cxxDestructFromClass(objc_object*, objc_class*)  +148</span><br><span class="line">8   libobjc.A.dylib                 objc_destructInstance  +92</span><br><span class="line">9   libobjc.A.dylib                 object_dispose  +28</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+
+<p>结合 <code>object_dispose</code> 的源码（版本：<a target="_blank" rel="noopener" href="https://opensource.apple.com/source/objc4/objc4-818.2/">objc4-818.2</a>）：</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line"><span class="keyword">void</span> *objc_destructInstance(<span class="keyword">id</span> obj)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (obj) &#123;</span><br><span class="line">        <span class="comment">// Read all of the flags at once for performance.</span></span><br><span class="line">        <span class="keyword">bool</span> cxx = obj-&gt;hasCxxDtor();</span><br><span class="line">        <span class="keyword">bool</span> assoc = obj-&gt;hasAssociatedObjects();</span><br><span class="line"></span><br><span class="line">        <span class="comment">// This order is important.</span></span><br><span class="line">        <span class="keyword">if</span> (cxx) object_cxxDestruct(obj);</span><br><span class="line">        <span class="keyword">if</span> (assoc) _object_remove_assocations(obj, <span class="comment">/*deallocating*/</span><span class="literal">true</span>);</span><br><span class="line">        obj-&gt;clearDeallocating();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> obj;</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">void</span> object_cxxDestruct(<span class="keyword">id</span> obj)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">if</span> (obj-&gt;isTaggedPointerOrNil()) <span class="keyword">return</span>;</span><br><span class="line">    object_cxxDestructFromClass(obj, obj-&gt;ISA());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以看到 Associated Objects 的释放是在 <code>object_cxxDestruct</code> 之后，那该方案获取的 dealloc 时机去移除所有的 observer 是不可行的。</p>
+<h2 id="ISA-Swizzling-方案"><a href="#ISA-Swizzling-方案" class="headerlink" title="ISA Swizzling 方案"></a>ISA Swizzling 方案</h2><p>我们都知道 KVO 的底层实现原理就是利用了 ISA Swizzling：被监听对象（A类的实例对象）的 ISA 指针会被指向其子类 NSKVONotifying_A，并重写了所有的 setter，从而实现了在 setter 中将值的变化回调监听者。那同样的，我们可以继承自类 A 创建类 AutoRemovableKVO_A，然后再添加监听（先后顺序没有严格要求），然后向 AutoRemovableKVO_A 中添加自定义的 dealloc 方法，实现拦截 dealloc 的目的，具体实现如下：</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line"><span class="meta">#import <span class="meta-string">&quot;ViewController.h&quot;</span></span></span><br><span class="line"><span class="meta">#import <span class="meta-string">&lt;objc/runtime.h&gt;</span></span></span><br><span class="line"><span class="meta">#import <span class="meta-string">&lt;objc/message.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">static</span> <span class="built_in">NSString</span> *<span class="keyword">const</span> AutoRemovableKVOClassNameToken = <span class="string">@&quot;AutoRemovableKVO_&quot;</span>;</span><br><span class="line"><span class="keyword">static</span> <span class="built_in">NSString</span> *<span class="keyword">const</span> KVOClassNameToken = <span class="string">@&quot;NSKVONotifying_&quot;</span>;</span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">NSObject</span> (<span class="title">AutoRemovableKVO</span>)</span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">NSObject</span> (<span class="title">AutoRemovableKVO</span>)</span></span><br><span class="line">+ (<span class="built_in">BOOL</span>)_shouldHookClass:(<span class="built_in">NSString</span> *)clzName &#123;</span><br><span class="line">    <span class="keyword">if</span> (clzName == <span class="literal">nil</span>) &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NO</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> [clzName rangeOfString:AutoRemovableKVOClassNameToken].location == <span class="built_in">NSNotFound</span>;</span><br><span class="line">&#125;</span><br><span class="line">+ (<span class="built_in">NSString</span> *)_newClassNameForClass:(<span class="built_in">NSString</span> *)clzName &#123;</span><br><span class="line">    <span class="built_in">NSString</span> *newClassName = <span class="literal">nil</span>;</span><br><span class="line">    <span class="keyword">if</span> ([<span class="keyword">self</span> _shouldHookClass:clzName]) &#123;</span><br><span class="line">        <span class="keyword">if</span> ([clzName hasPrefix:KVOClassNameToken]) &#123;</span><br><span class="line">            <span class="built_in">NSMutableString</span> *tmpStr = [clzName mutableCopy];</span><br><span class="line">            [tmpStr insertString:AutoRemovableKVOClassNameToken atIndex:KVOClassNameToken.length];</span><br><span class="line">            newClassName = [tmpStr <span class="keyword">copy</span>];</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            newClassName = [AutoRemovableKVOClassNameToken stringByAppendingString:clzName];</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> newClassName;</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">void</span>)_swizzleISAIfNeeded &#123;</span><br><span class="line">    <span class="built_in">NSString</span> *name = <span class="built_in">NSStringFromClass</span>(<span class="keyword">self</span>.class);</span><br><span class="line">    <span class="built_in">NSString</span> *newClassName = [<span class="built_in">NSObject</span> _newClassNameForClass:name];</span><br><span class="line">    <span class="keyword">if</span> (newClassName) &#123;</span><br><span class="line">        Method deallocM = class_getInstanceMethod(<span class="keyword">self</span>.class, <span class="keyword">@selector</span>(ar_dealloc));</span><br><span class="line">        <span class="keyword">if</span> (deallocM) &#123;</span><br><span class="line">            SEL deallocSel = <span class="built_in">NSSelectorFromString</span>(<span class="string">@&quot;dealloc&quot;</span>);</span><br><span class="line">            Class newClz = objc_allocateClassPair(<span class="keyword">self</span>.class, newClassName.UTF8String, <span class="number">0</span>);</span><br><span class="line">            class_addMethod(newClz, deallocSel, method_getImplementation(deallocM), method_getTypeEncoding(deallocM));</span><br><span class="line">            objc_registerClassPair(newClz);</span><br><span class="line">            object_setClass(<span class="keyword">self</span>, newClz);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">void</span>)ar_dealloc &#123;</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@&quot;%s&quot;</span>, __func__);</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">void</span>)ar_addObserver:(<span class="built_in">NSObject</span> *)observer forKeyPath:(<span class="built_in">NSString</span> *)keyPath options:(<span class="built_in">NSKeyValueObservingOptions</span>)options context:(<span class="keyword">void</span> *)context &#123;</span><br><span class="line">    [<span class="keyword">self</span> _swizzleISAIfNeeded];</span><br><span class="line">    [<span class="keyword">self</span> addObserver:observer forKeyPath:keyPath options:options context:context];</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">Base</span> : <span class="title">NSObject</span></span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">Base</span></span></span><br><span class="line">- (<span class="keyword">void</span>)dealloc &#123;</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@&quot;%s&quot;</span>, __func__);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">SomeObject</span> : <span class="title">Base</span></span></span><br><span class="line"><span class="keyword">@property</span> (<span class="keyword">nonatomic</span>, <span class="keyword">copy</span>) <span class="built_in">NSString</span> *name;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">SomeObject</span></span></span><br><span class="line">- (<span class="keyword">void</span>)dealloc &#123;</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@&quot;%s&quot;</span>, __func__);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">ViewController</span> ()</span></span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">ViewController</span></span></span><br><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)viewDidLoad &#123;</span><br><span class="line">    [<span class="keyword">super</span> viewDidLoad];</span><br><span class="line">    <span class="comment">// Do any additional setup after loading the view.</span></span><br><span class="line">    SomeObject *obj = [SomeObject new];</span><br><span class="line">    [obj ar_addObserver:<span class="keyword">self</span> forKeyPath:<span class="string">@&quot;name&quot;</span> options:<span class="built_in">NSKeyValueObservingOptionInitial</span>|<span class="built_in">NSKeyValueObservingOptionNew</span> context:<span class="literal">nil</span>];</span><br><span class="line">    obj.name = <span class="string">@&quot;new name&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">- (<span class="keyword">void</span>)observeValueForKeyPath:(<span class="built_in">NSString</span> *)keyPath ofObject:(<span class="keyword">id</span>)object change:(<span class="built_in">NSDictionary</span>&lt;<span class="built_in">NSKeyValueChangeKey</span>,<span class="keyword">id</span>&gt; *)change context:(<span class="keyword">void</span> *)context &#123;</span><br><span class="line">    <span class="built_in">NSLog</span>(<span class="string">@&quot;%@&quot;</span>, change);</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<p>简单运行代码你会发现被监听者的 ISA 虽然替换成功了，但是仅仅调用了我们创建对象的 dealloc 方法，父类的都没有被调用，导致该对象没有被释放，这是为什么呢？回去看了下 ARC 环境下自动调用<code>[super dealloc]</code>的原理，发现原来父类调用是在编译的时候插入的，从 llvm 项目中找到如下代码：</p>
+<figure class="highlight c++"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">CodeGenFunction::StartObjCMethod</span><span class="params">(<span class="keyword">const</span> ObjCMethodDecl *OMD,</span></span></span><br><span class="line"><span class="params"><span class="function">                                      <span class="keyword">const</span> ObjCContainerDecl *CD)</span> </span>&#123;</span><br><span class="line">  <span class="comment">// 省略...</span></span><br><span class="line">  <span class="comment">// In ARC, certain methods get an extra cleanup.</span></span><br><span class="line">  <span class="keyword">if</span> (CGM.<span class="built_in">getLangOpts</span>().ObjCAutoRefCount &amp;&amp;</span><br><span class="line">      OMD-&gt;<span class="built_in">isInstanceMethod</span>() &amp;&amp;</span><br><span class="line">      OMD-&gt;<span class="built_in">getSelector</span>().<span class="built_in">isUnarySelector</span>()) &#123;</span><br><span class="line">    <span class="keyword">const</span> IdentifierInfo *ident =</span><br><span class="line">      OMD-&gt;<span class="built_in">getSelector</span>().<span class="built_in">getIdentifierInfoForSlot</span>(<span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (ident-&gt;<span class="built_in">isStr</span>(<span class="string">&quot;dealloc&quot;</span>))</span><br><span class="line">      EHStack.pushCleanup&lt;FinishARCDealloc&gt;(<span class="built_in">getARCCleanupKind</span>());</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>判断条件是 selector 等于 dealloc，所以自然 ar_dealloc 不满足该条件，所以编译的时候没有插入父类调用，导致对象没有释放；于是这里换个方式，显式调用原本的 dealloc ，将为子类添加 dealloc 方法的方式换成 imp_block ：</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line">- (<span class="keyword">void</span>)_swizzleISAIfNeeded &#123;</span><br><span class="line">    Class clz = <span class="keyword">self</span>.class;</span><br><span class="line">    <span class="built_in">NSString</span> *name = <span class="built_in">NSStringFromClass</span>(clz);</span><br><span class="line">    <span class="built_in">NSString</span> *newClassName = [<span class="built_in">NSObject</span> _newClassNameForClass:name];</span><br><span class="line">    <span class="keyword">if</span> (newClassName) &#123;</span><br><span class="line">        SEL deallocSel = <span class="built_in">NSSelectorFromString</span>(<span class="string">@&quot;dealloc&quot;</span>);</span><br><span class="line">        Class newClz = objc_allocateClassPair(clz, newClassName.UTF8String, <span class="number">0</span>);</span><br><span class="line">        Method originDeallocM = class_getInstanceMethod(<span class="keyword">self</span>.class, deallocSel);</span><br><span class="line">        IMP originImp = method_getImplementation(originDeallocM);</span><br><span class="line">        IMP imp = imp_implementationWithBlock(^(__<span class="keyword">unsafe_unretained</span> <span class="built_in">NSObject</span> *<span class="keyword">self</span>)&#123;</span><br><span class="line">            <span class="built_in">NSLog</span>(<span class="string">@&quot;ar dealloc&quot;</span>);</span><br><span class="line">            ((<span class="keyword">void</span>(*)(<span class="built_in">NSObject</span> *))originImp)(<span class="keyword">self</span>);</span><br><span class="line">        &#125;);</span><br><span class="line">        class_addMethod(newClz, deallocSel, imp, <span class="string">&quot;v@:&quot;</span>);</span><br><span class="line">        objc_registerClassPair(newClz);</span><br><span class="line">        object_setClass(<span class="keyword">self</span>, newClz);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>此时运行代码看到对象可以被正确的释放，三个 dealloc 方法都有调用，并且可以保证对象释放之前执行一些自定义代码，可以满足我们的要求。</p>
+<h2 id="Method-Swizzling-方案"><a href="#Method-Swizzling-方案" class="headerlink" title="Method Swizzling 方案"></a>Method Swizzling 方案</h2><p>最后一个方案就是常规的 Method Swizzling，可以选择直接交换 NSObject 的 dealloc 方法，或者仅替换使用到的对象，后者需要做好方法是否替换的记录，其实现可以参考 <a target="_blank" rel="noopener" href="https://github.com/ReactiveCocoa/ReactiveObjC/blob/master/ReactiveObjC/NSObject%2BRACDeallocating.m">ReactiveObjc/RACDeallocating.m</a> ，前者的实现如下（里面有个问题不太理解，后续再更新）：</p>
+<figure class="highlight objc"><table><tr><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="keyword">void</span>(^ARObjectWillDeallocCallback)(<span class="built_in">NSObject</span> *__<span class="keyword">unsafe_unretained</span> obj);</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@interface</span> <span class="title">NSObject</span> (<span class="title">AutoRemovableKVO</span>)</span></span><br><span class="line"><span class="keyword">@property</span> (<span class="keyword">nonatomic</span>, <span class="keyword">copy</span>) ARObjectWillDeallocCallback ar_willDeallocCallback;</span><br><span class="line"><span class="keyword">@end</span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">@implementation</span> <span class="title">NSObject</span> (<span class="title">AutoRemovableKVO</span>)</span></span><br><span class="line">- (<span class="keyword">void</span>)setAr_willDeallocCallback:(ARObjectWillDeallocCallback)ar_willDeallocCallback &#123;</span><br><span class="line">    objc_setAssociatedObject(<span class="keyword">self</span>, <span class="keyword">@selector</span>(ar_willDeallocCallback), ar_willDeallocCallback, OBJC_ASSOCIATION_COPY_NONATOMIC);</span><br><span class="line">&#125;</span><br><span class="line">- (ARObjectWillDeallocCallback)ar_willDeallocCallback &#123;</span><br><span class="line">    <span class="keyword">return</span> objc_getAssociatedObject(<span class="keyword">self</span>, _cmd);</span><br><span class="line">&#125;</span><br><span class="line">+ (<span class="keyword">void</span>)load &#123;</span><br><span class="line">    Class cls = <span class="keyword">self</span>;</span><br><span class="line">    SEL deallocSel = <span class="built_in">NSSelectorFromString</span>(<span class="string">@&quot;dealloc&quot;</span>);</span><br><span class="line">    Method om = class_getInstanceMethod(cls, deallocSel);</span><br><span class="line">    Method rm = class_getInstanceMethod(cls, <span class="keyword">@selector</span>(ar_dealloc));</span><br><span class="line">    method_exchangeImplementations(om, rm);</span><br><span class="line">&#125;</span><br><span class="line">- (<span class="keyword">void</span>)ar_dealloc &#123;</span><br><span class="line">    <span class="comment">// NSLog(@&quot;xxx&quot;); // 加上这句就会 crash，为啥？</span></span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">self</span>.ar_willDeallocCallback) &#123;</span><br><span class="line">        <span class="keyword">self</span>.ar_willDeallocCallback(<span class="keyword">self</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    [<span class="keyword">self</span> ar_dealloc];</span><br><span class="line">&#125;</span><br><span class="line"><span class="keyword">@end</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>综上所述，三个方案都可以实现对象释放的监听，其中 Associated Object 不能满足 KVO 自动移除的背景需求，其他的都可以获取到合适的时机移除观察者，接下来就是 hook 添加和移除接口做好缓存以及保证线程安全即可。</p>
+<h2 id="参考链接"><a href="#参考链接" class="headerlink" title="参考链接"></a>参考链接</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://yulingtianxia.com/blog/2017/12/15/Associated-Object-and-Dealloc/">Associated Object 与 Dealloc - yulingtianxia</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/ChenYilong/CYLDeallocBlockExecutor">CYLDeallocBlockExecutor - ChenYilong</a></li>
+<li><a target="_blank" rel="noopener" href="http://blog.sunnyxx.com/2014/04/02/objc_dig_arc_dealloc/">ARC下dealloc过程及.cxx_destruct的探究 - sunnyxx</a></li>
+</ul>
+
+  </div>
+</article>
+
+
+    <div class="blog-post-comments">
+        <div id="utterances_thread">
+            <noscript>Please enable JavaScript to view the comments.</noscript>
+        </div>
+    </div>
+
+
+        
+          <div id="footer-post-container">
+  <div id="footer-post">
+
+    <div id="nav-footer" style="display: none">
+      <ul>
+         
+          <li><a href="/">Home</a></li>
+         
+          <li><a href="/archives/">Archives</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" style="display: none">
+      <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%97%AE%E9%A2%98%E8%83%8C%E6%99%AF"><span class="toc-number">1.</span> <span class="toc-text">问题背景</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Associated-Object-%E6%96%B9%E6%A1%88"><span class="toc-number">2.</span> <span class="toc-text">Associated Object 方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#ISA-Swizzling-%E6%96%B9%E6%A1%88"><span class="toc-number">3.</span> <span class="toc-text">ISA Swizzling 方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Method-Swizzling-%E6%96%B9%E6%A1%88"><span class="toc-number">4.</span> <span class="toc-text">Method Swizzling 方案</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E6%80%BB%E7%BB%93"><span class="toc-number">5.</span> <span class="toc-text">总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%8F%82%E8%80%83%E9%93%BE%E6%8E%A5"><span class="toc-number">6.</span> <span class="toc-text">参考链接</span></a></li></ol>
+    </div>
+
+    <div id="share-footer" style="display: none">
+      <ul>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.facebook.com/sharer.php?u=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/"><i class="fab fa-facebook fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://twitter.com/share?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&text=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-twitter fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.linkedin.com/shareArticle?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-linkedin fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://pinterest.com/pin/create/bookmarklet/?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&is_video=false&description=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-pinterest fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" href="mailto:?subject=关于 Objective-C 中监听对象释放的几种尝试&body=Check out this article: https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/"><i class="fas fa-envelope fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://getpocket.com/save?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-get-pocket fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://reddit.com/submit?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-reddit fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.stumbleupon.com/submit?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-stumbleupon fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://digg.com/submit?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&title=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-digg fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="http://www.tumblr.com/share/link?url=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&name=关于 Objective-C 中监听对象释放的几种尝试&description="><i class="fab fa-tumblr fa-lg" aria-hidden="true"></i></a></li>
+  <li><a class="icon" target="_blank" rel="noopener" href="https://news.ycombinator.com/submitlink?u=https://chenxgen.github.io/2022/01/29/about-how-to-hook-dealloc/&t=关于 Objective-C 中监听对象释放的几种尝试"><i class="fab fa-hacker-news fa-lg" aria-hidden="true"></i></a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+        <a id="menu" class="icon" href="#" onclick="$('#nav-footer').toggle();return false;"><i class="fas fa-bars fa-lg" aria-hidden="true"></i> Menu</a>
+        <a id="toc" class="icon" href="#" onclick="$('#toc-footer').toggle();return false;"><i class="fas fa-list fa-lg" aria-hidden="true"></i> TOC</a>
+        <a id="share" class="icon" href="#" onclick="$('#share-footer').toggle();return false;"><i class="fas fa-share-alt fa-lg" aria-hidden="true"></i> Share</a>
+        <a id="top" style="display:none" class="icon" href="#" onclick="$('html, body').animate({ scrollTop: 0 }, 'fast');"><i class="fas fa-chevron-up fa-lg" aria-hidden="true"></i> Top</a>
+    </div>
+
+  </div>
+</div>
+
+        
+        <footer id="footer">
+  <div class="footer-left">
+    Copyright &copy;
+    
+    
+    2021-2022
+    chenxGen
+  </div>
+  <div class="footer-right">
+    <nav>
+      <ul>
+        <!--
+       --><li><a href="/">Home</a></li><!--
+     --><!--
+       --><li><a href="/archives/">Archives</a></li><!--
+     -->
+      </ul>
+    </nav>
+  </div>
+</footer>
+
+    </div>
+    <!-- styles -->
+
+
+
+  <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" crossorigin="anonymous" onload="this.onload=null;this.rel='stylesheet'"/>
+
+
+    <!-- jquery -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" crossorigin="anonymous"></script>
+
+
+
+
+<!-- clipboard -->
+
+  
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.7/clipboard.min.js" crossorigin="anonymous"></script>
+  
+  <script type="text/javascript">
+  $(function() {
+    // copy-btn HTML
+    var btn = "<span class=\"btn-copy tooltipped tooltipped-sw\" aria-label=\"Copy to clipboard!\">";
+    btn += '<i class="far fa-clone"></i>';
+    btn += '</span>';
+    // mount it!
+    $(".highlight table").before(btn);
+    var clip = new ClipboardJS('.btn-copy', {
+      text: function(trigger) {
+        return Array.from(trigger.nextElementSibling.querySelectorAll('.code')).reduce((str,it)=>str+it.innerText+'\n','')
+      }
+    });
+    clip.on('success', function(e) {
+      e.trigger.setAttribute('aria-label', "Copied!");
+      e.clearSelection();
+    })
+  })
+  </script>
+
+
+<script src="/js/main.js"></script>
+
+<!-- search -->
+
+<!-- Google Analytics -->
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-7SMDQBM12Y"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-7SMDQBM12Y');
+    </script>
+
+<!-- Baidu Analytics -->
+
+  <script type="text/javascript">
+        var _hmt = _hmt || [];
+        (function() {
+          var hm = document.createElement("script");
+          hm.src = "https://hm.baidu.com/hm.js?59d432d2e7d9e79514c56b44403e96af";
+          var s = document.getElementsByTagName("script")[0];
+          s.parentNode.insertBefore(hm, s);
+        })();
+        </script>
+
+<!-- Cloudflare Analytics -->
+
+<!-- Umami Analytics -->
+
+<!-- Disqus Comments -->
+
+<!-- utterances Comments -->
+
+    <script type="text/javascript">
+      var utterances_repo = 'chenxGen/chenxGen.github.io';
+      var utterances_issue_term = 'title';
+      var utterances_label = 'comments';
+      var utterances_theme = 'github-dark';
+
+      (function(){
+          var script = document.createElement('script');
+
+          script.src = 'https://utteranc.es/client.js';
+          script.setAttribute('repo', utterances_repo);
+          script.setAttribute('issue-term', utterances_issue_term);
+          script.setAttribute('label', utterances_label);
+          script.setAttribute('theme', utterances_theme);
+          script.setAttribute('crossorigin', 'anonymous');
+          script.async = true;
+          (document.getElementById('utterances_thread')).appendChild(script);
+      }());
+  </script>
+
+
+</body>
+</html>
